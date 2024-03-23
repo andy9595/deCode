@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Tesseract.js Video Streaming Recognition</title>
+  <link rel="stylesheet" href="./css/style.css">
+  <script src=' https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'> </script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@latest/dist/jsQR.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
+</head>
+
+<body>
+  <div id="root">
+    <video width="500" height="500" id="cameraVideo"></video>
+    <div>
+      <div id="messages-wrap">
+        <div id="message-live"></div>
+        <div id="message-qr-code"></div>
+        <div id="message-line-code"></div>
+      </div>
+    </div>
+  </div>
+  <div>
+
+  </div>
+  <script>
+
+    const cameraVideo = document.getElementById('cameraVideo')
+    // 开启实时预览摄像头
+    //用来匹配不同的浏览器
+    function getUserMedia(constraints, success, error, type) {
+      if (navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices
+          .getUserMedia(constraints)
+          .then(res => {
+            success(res, type);
+          })
+          .catch(error);
+      } else if (navigator.webkitGetUserMedia) {
+        navigator.webkitGetUserMedia(
+          constraints,
+          res => {
+            success(res, type);
+          },
+          error
+        );
+      } else if (navigator.mozGetUserMedia) {
+        navigator.mozGetUserMedia(
+          constraints,
+          res => {
+            success(res, type);
+          },
+          error
+        );
+      } else if (navigator.getUserMedia) {
+        navigator.getUserMedia(
+          constraints,
+          res => {
+            success(res, type);
+          },
+          error
+        );
+      }
+    }
+
+    //失败回调
+    const errorView = () => {
+      console.log('error')
+    };
+    //成功回调
+    const successView = (stream, type) => {
+      if (type === "view") {
+        cameraVideo.srcObject = stream;
+        cameraVideo.play();
+      }
+    };
+
+
+
+    const { createWorker, createScheduler } = Tesseract;
+    const scheduler = createScheduler();
+    const video = document.getElementById('poem-video');
+    const messages = document.getElementById('message-live');
+    let timerId = null;
+
+    const addMessage = ({ message, isBold, wrap }) => {
+      let msg = `<p>${message}</p>`;
+      if (isBold) {
+        msg = `<p class="bold">${message}</p>`;
+      }
+      const dom = document.getElementById(wrap);
+      dom.innerHTML += msg;
+      dom.scrollTop = dom.scrollHeight;
+    }
+    // 解析Ocr
+    const doOCR = async () => {
+      const c = document.createElement('canvas');
+      c.width = 500;
+      c.height = 500;
+      const ctx = c.getContext('2d')
+      ctx.drawImage(cameraVideo, 0, 0, 500, 500);
+
+      // orc
+      const start = new Date();
+      const { data: { text } } = await scheduler.addJob('recognize', c);
+      const end = new Date()
+      addMessage({ message: `[${start.getMinutes()}:${start.getSeconds()} - ${end.getMinutes()}:${end.getSeconds()}], ${(end - start) / 1000} s`, wrap: 'message-live' });
+      text.split('\n').forEach((line) => {
+        addMessage({ message: line, wrap: 'message-live' });
+      });
+    };
+    // 解析二维码
+    const doQrCOde = () => {
+      const c = document.createElement('canvas');
+      c.width = 500;
+      c.height = 500;
+      const ctx = c.getContext('2d')
+      ctx.drawImage(cameraVideo, 0, 0, 500, 500);
+
+      // 识别二位码
+      const imageData = ctx.getImageData(0, 0, 500, 500)
+      var canvas = document.createElement('canvas');
+      canvas.width = imageData.width;
+      canvas.height = imageData.height;
+      const code = jsQR(imageData.data, 500, 500);
+      if (code) {
+        addMessage({ message: `二维码:${code.data}`, wrap: 'message-qr-code' })
+      }
+    }
+    // 解析条形码
+    const doCode = () => {
+      Quagga.decodeSingle({
+        inputStream: {
+          name: "Live",
+          type: "LiveStream",
+          target: document.querySelector('#cameraVideo')    // Or '#yourElement' (optional)
+        },
+        decoder: {
+          readers: ["code_128_reader"]
+        }
+      }, function (result) {
+        //识别结果
+        if (result?.codeResult) {
+          addMessage({ message: `条形码:${result.codeResult.code}`, wrap: 'message-line-code' })
+        } else {
+          // alert("未识别到图片中的条形码！");
+        }
+      });
+    }
+
+    (async () => {
+      addMessage({ message: 'Initializing Tesseract.js', wrap: 'message-live' });
+      for (let i = 0; i < 4; i++) {
+        const worker = await createWorker();
+        scheduler.addWorker(worker);
+      }
+      addMessage({ message: 'Initialized Tesseract.js', wrap: 'message-live' });
+      cameraVideo.addEventListener('play', () => {
+        timerId = setInterval(() => {
+          doOCR()
+          doQrCOde()
+          doCode()
+        }, 1000);
+      });
+      cameraVideo.addEventListener('pause', () => {
+        clearInterval(timerId);
+      });
+      addMessage({ message: 'Now you can play the video. :)', wrap: 'message-live' });
+      cameraVideo.controls = true;
+      // 初始化预览弹窗video
+      getUserMedia(
+        {
+          video: {
+            width: 500,
+            height: 500,
+          }
+        },
+        successView,
+        errorView,
+        "view"
+      );
+      // 获取条形码初始化
+
+    })();
+
+
+  </script>
+</body>
+
+</html>

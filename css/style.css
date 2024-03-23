@@ -1,0 +1,38 @@
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+.bold {
+  font-weight: bold;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+  display: flex;
+}
+
+#sep {
+  width: 16px;
+}
+#messages-wrap{
+  display:flex
+}
+
+#message-live {
+  width: 640px;
+  height: 360px;
+  overflow: auto;
+}
+#message-qr-code {
+  width: 640px;
+  height: 360px;
+  overflow: auto;
+}
+#message-line-code {
+  width: 640px;
+  height: 360px;
+  overflow: auto;
+}
